@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบสแกนใบหน้าลงเวลาพนักงาน (Face Recognition Check-in Demo)</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Font Awesome Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Thai Font Sarabun -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Face-API.js Vladmandic Fork @1.7.12 -->
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
+
+  <style>
+    body {
+      font-family: 'Sarabun', sans-serif;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-sky-500 selection:text-white">
+
+  <header class="border-b border-slate-800 bg-slate-900/90 sticky top-0 z-40 backdrop-blur-md shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-start">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+            <i class="fa-solid fa-id-badge text-xl text-white"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-slate-100 tracking-tight flex items-center gap-2">
+              ระบบสแกนใบหน้าลงเวลาพนักงาน
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">v3.3 Standalone</span>
+            </h1>
+            <p class="text-xs text-slate-400">จำแนก 5 กอง/หน่วยงาน สแกนและลงเวลางานอัตโนมัติด้วย AI</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Google Apps Script URL Integration Box -->
+      <div id="configPanel" class="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-800/80 p-2 rounded-xl border border-slate-700/60">
+        <div class="flex items-center px-2 text-xs text-slate-400 whitespace-nowrap">
+          <i class="fa-solid fa-cloud-arrow-up text-sky-400 mr-2"></i>
+          <span>Google Apps Script URL:</span>
+        </div>
+        <div class="relative flex-1 sm:w-64">
+          <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" 
+                 class="w-full bg-slate-900 text-xs text-slate-200 placeholder-slate-500 px-3 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-sky-500 transition-colors">
+        </div>
+        <button onclick="saveScriptUrl()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm">
+          <i class="fa-solid fa-floppy-disk"></i>
+          <span>บันทึก URL</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div id="iframeNoticeBanner" class="hidden max-w-7xl mx-auto w-full px-4 pt-4">
+    <div class="bg-amber-950/80 border border-amber-600/60 rounded-xl p-4 text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+      <div class="flex items-start gap-3">
+        <i class="fa-solid fa-triangle-exclamation text-amber-400 text-xl mt-0.5"></i>
+        <div>
+          <h4 class="font-bold text-sm text-amber-300">แจ้งเตือนการใช้งานบน Canvas Preview</h4>
+          <p class="text-xs text-amber-200/90 mt-0.5">
+            กล้องอาจถูกบล็อกสิทธิ์เพราะกำลังดูผ่านหน้า Preview ของ Canvas กรุณากดดาวน์โหลดไฟล์ <code class="bg-amber-900/60 px-1 py-0.5 rounded text-amber-100">index.html</code> แล้วเปิดไฟล์ตรงๆ ในเบราว์เซอร์ (หรือนำไปอัปโหลดขึ้นเว็บโฮสติ้ง เช่น Netlify) เพื่อใช้งานกล้องได้เต็มรูปแบบ
+          </p>
+        </div>
+      </div>
+      <button onclick="closeIframeNotice()" class="text-xs text-amber-400 hover:text-white underline whitespace-nowrap self-end sm:self-center">
+        รับทราบ / ซ่อน
+      </button>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8 flex-1">
+
+    <!-- Section 1: Employee Registration -->
+    <section class="bg-slate-900/80 rounded-2xl border border-slate-800 p-5 shadow-xl relative overflow-hidden">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800">
+        <div>
+          <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-user-plus text-sky-400"></i>
+            ส่วนที่ 1: ลงทะเบียนข้อมูลพนักงาน & จัดหมวดหมู่ กอง/หน่วยงาน
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">
+            เลือกสังกัดกอง/หน่วยงาน ระบบจะสร้างรหัสขึ้นต้นให้อัตโนมัติ อัปโหลดรูปภาพใบหน้าชัดเจน 1 รูปต่อคน
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="addEmployeeForm()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors flex items-center gap-2 shadow-sm active:scale-95">
+            <i class="fa-solid fa-plus text-sky-400"></i>
+            <span>+ เพิ่มฟอร์มพนักงาน</span>
+          </button>
+          
+          <button onclick="confirmResetEmployees()" class="px-3 py-2 bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 text-xs font-semibold rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5" title="ล้างข้อมูลพนักงานที่บันทึกไว้">
+            <i class="fa-solid fa-rotate-left"></i>
+            <span>รีเซ็ตพนักงาน</span>
+          </button>
+          
+          <button onclick="buildFaceDatabase()" id="btnBuildDatabase" class="px-5 py-2 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-sky-500/20 transition-all transform active:scale-95 flex items-center gap-2">
+            <i class="fa-solid fa-brain"></i>
+            <span>Build Face Database</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-slate-950/60 rounded-xl p-3 mb-6 border border-slate-800 text-xs flex flex-wrap items-center gap-3">
+        <span class="font-bold text-slate-300 flex items-center gap-1">
+          <i class="fa-solid fa-sitemap text-indigo-400"></i>
+          รหัสขึ้นต้นตาม 5 หน่วยงานหลัก:
+        </span>
+        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">OFF-</strong> สำนักปลัด</span>
+        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">FIN-</strong> กองคลัง</span>
+        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">EDU-</strong> กองการศึกษา</span>
+        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">ENG-</strong> กองช่าง</span>
+        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">PHE-</strong> กองสาธารณสุขและสิ่งแวดล้อม</span>
+      </div>
+
+      <!-- Dynamic Employee Registration Cards Container -->
+      <div id="formsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Dynamic Cards generated by JavaScript -->
+      </div>
+
+      <!-- Build Database Progress Indicator -->
+      <div id="buildProgressContainer" class="hidden mt-6 p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+        <div class="flex items-center justify-between text-xs font-semibold">
+          <span id="buildStatusText" class="text-sky-400 flex items-center gap-2">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            กำลังประมวลผลสกัดข้อมูลใบหน้า (Face Descriptors)...
+          </span>
+          <span id="buildPercentText" class="text-slate-400">0%</span>
+        </div>
+        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+          <div id="buildProgressBar" class="bg-gradient-to-r from-sky-500 to-indigo-500 h-full w-0 transition-all duration-300"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-slate-900/80 rounded-2xl border border-slate-800 p-5 shadow-xl">
+      <div class="mb-4 pb-3 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-camera text-emerald-400"></i>
+            ส่วนที่ 2: สแกนใบหน้าลงเวลา (Scan & Auto Check-In/Out)
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">
+            ระบบล็อคใบหน้าแม่นยำสูง สแกนอัตโนมัติแยก เข้างาน (<12.00 น.) / ออกงาน (≥12.00 น.)
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <div id="currentShiftBadge" class="px-3 py-1.5 rounded-xl bg-sky-950/80 text-sky-300 border border-sky-800/80 text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-clock text-sky-400"></i>
+            <span id="shiftText">โหมดเข้างาน (< 12:00 น.)</span>
+          </div>
+          <div class="px-3 py-1.5 rounded-xl bg-indigo-950/80 text-indigo-300 border border-indigo-800/80 text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-shield-halved text-indigo-400"></i>
+            <span>ล็อคใบหน้าแม่นยำสูง (Strict 0.40)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Camera Viewport Column -->
+        <div class="lg:col-span-7 flex flex-col items-center space-y-3">
+          <div class="relative w-full aspect-video bg-slate-950 rounded-2xl border-2 border-slate-800 overflow-hidden shadow-2xl flex items-center justify-center group">
+            
+            <video id="webcam" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100"></video>
+            <canvas id="overlayCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+
+            <!-- Placeholder State -->
+            <div id="cameraPlaceholder" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center space-y-3">
+              <div class="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 text-2xl">
+                <i class="fa-solid fa-video-slash"></i>
+              </div>
+              <div>
+                <h3 class="text-slate-200 font-semibold text-sm">กล้องยังไม่ได้เปิดใช้งาน</h3>
+                <p class="text-slate-400 text-xs mt-1">โปรดกดปุ่ม "Build Face Database" จากนั้นกด "เริ่มเปิดกล้อง"</p>
+              </div>
+            </div>
+
+            <!-- Camera Error Overlay -->
+            <div id="cameraErrorOverlay" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center space-y-3 z-20">
+              <div class="w-12 h-12 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-circle-exclamation"></i>
+              </div>
+              <div>
+                <h3 id="cameraErrorTitle" class="text-red-300 font-bold text-sm">ไม่สามารถเข้าถึงกล้องได้</h3>
+                <p id="cameraErrorMessage" class="text-slate-300 text-xs mt-1 max-w-md">เหตุผล: NotAllowedError</p>
+              </div>
+              <div id="iframeHelpText" class="hidden text-xs text-amber-300/90 bg-amber-950/60 p-3 rounded-xl border border-amber-800/50 max-w-md text-left">
+                <i class="fa-solid fa-circle-info mr-1"></i>
+                <strong>คำแนะนำ Canvas Preview:</strong><br>
+                กล้องถูกบล็อกสิทธิ์ใน Preview iframe กรุณากดดาวน์โหลดไฟล์ <code class="text-white">index.html</code> แล้วเปิดตรงๆ ในเบราว์เซอร์
+              </div>
+              <button onclick="startCamera()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl border border-slate-600 flex items-center gap-2">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>ลองใหม่อีกครั้ง</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Camera Toggle Control Buttons -->
+          <div class="flex items-center gap-3 w-full justify-center">
+            <button id="btnStartCamera" onclick="startCamera()" disabled
+                    class="flex-1 max-w-xs py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-xs font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+              <i class="fa-solid fa-play"></i>
+              <span>เริ่มเปิดกล้อง</span>
+            </button>
+            <button id="btnStopCamera" onclick="stopCamera()" disabled
+                    class="px-4 py-2.5 bg-slate-800 hover:bg-rose-600/80 disabled:bg-slate-800 disabled:text-slate-600 text-slate-300 text-xs font-bold rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2">
+              <i class="fa-solid fa-stop"></i>
+              <span>ปิดกล้อง</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5 flex flex-col justify-between space-y-4">
+          <div class="bg-slate-950/80 rounded-2xl p-5 border border-slate-800 h-full flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">ผลการสแกนตรวจจับ</span>
+                <span id="scanStatusBadge" class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+                  ยังไม่เริ่มสแกน
+                </span>
+              </div>
+
+              <!-- Detected Employee Profile Info -->
+              <div id="detectedPersonCard" class="flex items-start gap-4 mb-4">
+                <div class="w-20 h-20 rounded-2xl bg-slate-800 border-2 border-slate-700 overflow-hidden flex items-center justify-center shrink-0 shadow-md">
+                  <img id="detectedImg" src="" class="hidden w-full h-full object-cover">
+                  <i id="detectedPlaceholderIcon" class="fa-solid fa-user text-3xl text-slate-600"></i>
+                </div>
+
+                <div class="space-y-1.5 flex-1 min-w-0">
+                  <h3 id="detectedName" class="text-base font-bold text-slate-100 truncate">-- รอการสแกน --</h3>
+                  
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span id="detectedEmpId" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-sky-400 border border-slate-700">ID: --</span>
+                    <span id="detectedDivision" class="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800/60">
+                      สังกัด: --
+                    </span>
+                  </div>
+
+                  <p id="detectedDeptPos" class="text-xs text-slate-400 truncate">ฝ่าย: -- | ตำแหน่ง: --</p>
+                  <p id="detectedMatchScore" class="text-[11px] text-slate-500">ค่าความตรงกัน (Distance): --</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Manual & Auto Check-in Action Controls -->
+            <div class="space-y-3 pt-3 border-t border-slate-800">
+              <div class="grid grid-cols-2 gap-3">
+                <button id="btnCheckIn" onclick="handleManualCheckInOut('IN')" disabled
+                        class="py-3 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-900/30 transition-all flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-right-to-bracket text-sm"></i>
+                  <span>บันทึก "เข้างาน"</span>
+                </button>
+                <button id="btnCheckOut" onclick="handleManualCheckInOut('OUT')" disabled
+                        class="py-3 px-4 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-amber-900/30 transition-all flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-right-from-bracket text-sm"></i>
+                  <span>บันทึก "ออกงาน"</span>
+                </button>
+              </div>
+
+              <div class="flex flex-col gap-2 bg-slate-950/90 p-3 rounded-xl border border-slate-800">
+                <div class="flex items-center justify-between text-xs text-slate-300">
+                  <label for="autoCheckInToggle" class="cursor-pointer flex items-center gap-2 select-none font-semibold">
+                    <input type="checkbox" id="autoCheckInToggle" checked class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0">
+                    <span class="text-emerald-400">ระบบสแกนอัตโนมัติ (Auto Check-In/Out)</span>
+                  </label>
+                  <i class="fa-solid fa-bolt text-amber-400 animate-pulse" title="โหมดสแกนอัตโนมัติเปิดอยู่"></i>
+                </div>
+                <div class="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80">
+                  <span><i class="fa-solid fa-arrows-rotate text-sky-400 mr-1"></i>ป้องกันสแกนซ้ำ: 5 นาที</span>
+                  <span id="autoScanRuleHint" class="text-amber-300 font-semibold">12:00 น. เป็นต้นไป = บันทึกออกงาน</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-slate-900/80 rounded-2xl border border-slate-800 p-5 shadow-xl">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 pb-4 border-b border-slate-800">
+        <div>
+          <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-sky-400"></i>
+            ส่วนที่ 3: ประวัติการลงเวลางาน (Attendance Logs)
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">
+            ข้อมูลบันทึกใน LocalStorage ถาวร พร้อมคัดกรองตามกอง/หน่วยงาน และดาวน์โหลด CSV/Excel
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="exportToCSV()" class="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 shadow-md">
+            <i class="fa-solid fa-file-excel"></i>
+            <span>ดาวน์โหลด Excel/CSV</span>
+          </button>
+          <button onclick="confirmClearLogs()" class="px-3.5 py-2 bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5">
+            <i class="fa-solid fa-trash-can"></i>
+            <span>ล้างข้อมูล</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Log Table Filters -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">กรองตาม กอง/หน่วยงาน</label>
+          <select id="filterDivision" onchange="renderLogsTable()" class="w-full bg-slate-950 text-xs text-slate-200 rounded-xl px-3 py-2 border border-slate-800 focus:outline-none focus:border-sky-500">
+            <option value="ALL">-- แสดงทุกหน่วยงาน --</option>
+            <option value="OFF">สำนักปลัด (OFF)</option>
+            <option value="FIN">กองคลัง (FIN)</option>
+            <option value="EDU">กองการศึกษา (EDU)</option>
+            <option value="ENG">กองช่าง (ENG)</option>
+            <option value="PHE">กองสาธารณสุขและสิ่งแวดล้อม (PHE)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">ค้นหา (ชื่อ / รหัสพนักงาน)</label>
+          <div class="relative">
+            <input type="text" id="filterSearch" oninput="renderLogsTable()" placeholder="พิมพ์ชื่อ หรือ ID..." 
+                   class="w-full bg-slate-950 text-xs text-slate-200 rounded-xl pl-8 pr-3 py-2 border border-slate-800 focus:outline-none focus:border-sky-500">
+            <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-500 text-xs"></i>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">กรองประเภท</label>
+          <select id="filterType" onchange="renderLogsTable()" class="w-full bg-slate-950 text-xs text-slate-200 rounded-xl px-3 py-2 border border-slate-800 focus:outline-none focus:border-sky-500">
+            <option value="ALL">-- ทุกประเภท --</option>
+            <option value="IN">เข้างาน (Check-In)</option>
+            <option value="OUT">ออกงาน (Check-Out)</option>
+          </select>
+        </div>
+
+        <div class="flex items-end">
+          <div class="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 flex items-center justify-between">
+            <span>รวมทั้งหมด:</span>
+            <strong id="logCountBadge" class="text-sky-400 text-sm font-bold">0 รายการ</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs Table -->
+      <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider text-[11px] border-b border-slate-800">
+            <tr>
+              <th class="py-3 px-4">วัน-เวลา</th>
+              <th class="py-3 px-4">ประเภท</th>
+              <th class="py-3 px-4">รหัสพนักงาน</th>
+              <th class="py-3 px-4">ชื่อ-นามสกุล</th>
+              <th class="py-3 px-4">สังกัด กอง/หน่วยงาน</th>
+              <th class="py-3 px-4">ฝ่าย / ตำแหน่ง</th>
+              <th class="py-3 px-4 text-center">สถานะ Cloud</th>
+            </tr>
+          </thead>
+          <tbody id="logsTableBody" class="divide-y divide-slate-800/60 bg-slate-900/40">
+            <!-- Log rows dynamically injected -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Toast Notification Overlay -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none max-w-md">
+    <div id="toastContent" class="bg-slate-800 text-slate-100 border border-slate-700 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3">
+      <i id="toastIcon" class="fa-solid fa-circle-info text-sky-400 text-lg"></i>
+      <span id="toastMessage" class="text-xs font-medium">การแจ้งเตือน</span>
+    </div>
+  </div>
+
+  <!-- Custom App Dialog Modal (Replaces Browser alert() / confirm()) -->
+  <div id="appModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+      <div id="appModalIconBg" class="w-12 h-12 rounded-2xl bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-xl mx-auto">
+        <i id="appModalIcon" class="fa-solid fa-circle-info"></i>
+      </div>
+      <div class="text-center space-y-1">
+        <h3 id="appModalTitle" class="text-base font-bold text-slate-100">แจ้งเตือน</h3>
+        <p id="appModalMessage" class="text-xs text-slate-300 leading-relaxed">รายละเอียดการแจ้งเตือน</p>
+      </div>
+      <div id="appModalActions" class="flex gap-3 pt-2">
+        <button id="btnModalPrimary" class="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow-lg transition-colors">
+          ตกลง
+        </button>
+        <button id="btnModalSecondary" class="hidden w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition-colors">
+          ยกเลิก
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Safe storage wrapper to prevent SecurityError in sandboxed iFrames where localStorage access is denied
+    const safeStorage = {
+      _memoryStore: {},
+      getItem(key) {
+        try {
+          return localStorage.getItem(key);
+        } catch (e) {
+          console.warn(`localStorage.getItem restricted (${e.message}). Falling back to in-memory store.`);
+          return this._memoryStore[key] || null;
+        }
+      },
+      setItem(key, value) {
+        try {
+          localStorage.setItem(key, value);
+        } catch (e) {
+          console.warn(`localStorage.setItem restricted (${e.message}). Saving in-memory.`);
+          this._memoryStore[key] = String(value);
+        }
+      },
+      removeItem(key) {
+        try {
+          localStorage.removeItem(key);
+        } catch (e) {
+          console.warn(`localStorage.removeItem restricted (${e.message}). Deleting in-memory.`);
+          delete this._memoryStore[key];
+        }
+      }
+    };
+
+    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
+    const LOCAL_STORAGE_LOGS_KEY = 'face_checkin_logs_v3';
+    const LOCAL_STORAGE_SCRIPT_KEY = 'face_checkin_script_url';
+    const LOCAL_STORAGE_EMPLOYEES_KEY = 'face_checkin_employees_v3';
+    const LOCAL_STORAGE_DESCRIPTORS_KEY = 'face_checkin_descriptors_v3';
+
+    // Strict face recognition threshold and anti-duplicate cooldown duration
+    const STRICT_DISTANCE_THRESHOLD = 0.40; // High accuracy lock threshold
+    const SCAN_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown per person
+
+    // Fixed 5 Division Definitions
+    const DIVISIONS = {
+      'OFF': { name: 'สำนักปลัด', prefix: 'OFF' },
+      'FIN': { name: 'กองคลัง', prefix: 'FIN' },
+      'EDU': { name: 'กองการศึกษา', prefix: 'EDU' },
+      'ENG': { name: 'กองช่าง', prefix: 'ENG' },
+      'PHE': { name: 'กองสาธารณสุขและสิ่งแวดล้อม', prefix: 'PHE' }
+    };
+
+    // App Global State
+    let formIdCounter = 1;
+    let employeeForms = [];
+    let isModelsLoaded = false;
+    let faceMatcher = null;
+    let registeredDescriptorsMap = [];
+    let mediaStream = null;
+    let isCameraScanning = false;
+    let scanIntervalId = null;
+    let currentDetectedPerson = null;
+
+    let scanCooldownsMap = {};
+    let matchStreakMap = {};
+
+    function showModalAlert(title, message, type = 'info') {
+      const modal = document.getElementById('appModal');
+      const modalTitle = document.getElementById('appModalTitle');
+      const modalMsg = document.getElementById('appModalMessage');
+      const modalIcon = document.getElementById('appModalIcon');
+      const modalIconBg = document.getElementById('appModalIconBg');
+      const btnPrimary = document.getElementById('btnModalPrimary');
+      const btnSecondary = document.getElementById('btnModalSecondary');
+
+      if (!modal) return;
+
+      modalTitle.textContent = title;
+      modalMsg.textContent = message;
+      btnSecondary.classList.add('hidden');
+      btnPrimary.className = "w-full py-2 text-xs font-bold rounded-xl shadow-lg transition-colors text-white";
+
+      if (type === 'error') {
+        modalIcon.className = "fa-solid fa-circle-exclamation";
+        modalIconBg.className = "w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center text-xl mx-auto";
+        btnPrimary.classList.add('bg-rose-600', 'hover:bg-rose-500');
+      } else if (type === 'warning') {
+        modalIcon.className = "fa-solid fa-triangle-exclamation";
+        modalIconBg.className = "w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center text-xl mx-auto";
+        btnPrimary.classList.add('bg-amber-600', 'hover:bg-amber-500');
+      } else {
+        modalIcon.className = "fa-solid fa-circle-info";
+        modalIconBg.className = "w-12 h-12 rounded-2xl bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-xl mx-auto";
+        btnPrimary.classList.add('bg-sky-600', 'hover:bg-sky-500');
+      }
+
+      btnPrimary.onclick = () => modal.classList.add('hidden');
+      modal.classList.remove('hidden');
+    }
+
+    function showModalConfirm(title, message, onConfirm) {
+      const modal = document.getElementById('appModal');
+      const modalTitle = document.getElementById('appModalTitle');
+      const modalMsg = document.getElementById('appModalMessage');
+      const modalIcon = document.getElementById('appModalIcon');
+      const modalIconBg = document.getElementById('appModalIconBg');
+      const btnPrimary = document.getElementById('btnModalPrimary');
+      const btnSecondary = document.getElementById('btnModalSecondary');
+
+      if (!modal) return;
+
+      modalTitle.textContent = title;
+      modalMsg.textContent = message;
+      
+      modalIcon.className = "fa-solid fa-triangle-exclamation";
+      modalIconBg.className = "w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center text-xl mx-auto";
+
+      btnSecondary.classList.remove('hidden');
+      btnPrimary.className = "flex-1 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-lg transition-colors";
+      btnSecondary.className = "flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition-colors";
+
+      btnPrimary.onclick = () => {
+        modal.classList.add('hidden');
+        if (typeof onConfirm === 'function') onConfirm();
+      };
+
+      btnSecondary.onclick = () => modal.classList.add('hidden');
+      modal.classList.remove('hidden');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedScriptUrl = safeStorage.getItem(LOCAL_STORAGE_SCRIPT_KEY);
+      if (savedScriptUrl) {
+        const scriptInput = document.getElementById('scriptUrlInput');
+        if (scriptInput) scriptInput.value = savedScriptUrl;
+      }
+
+      if (window.self !== window.top) {
+        document.getElementById('iframeNoticeBanner')?.classList.remove('hidden');
+      }
+
+      // Restore saved employee forms if existing, otherwise load default 5 forms
+      const savedForms = loadEmployeesFromStorage();
+      if (savedForms && savedForms.length > 0) {
+        employeeForms = savedForms;
+        formIdCounter = Math.max(...employeeForms.map(f => f.id || 0), 0) + 1;
+        renderEmployeeForms();
+      } else {
+        initializeDefaultForms();
+      }
+
+      // Restore pre-built face descriptors if available
+      loadDescriptorsFromStorage();
+
+      renderLogsTable();
+      updateShiftBadgeInfo();
+
+      setInterval(updateShiftBadgeInfo, 60000);
+    });
+
+    function saveEmployeesToStorage() {
+      try {
+        safeStorage.setItem(LOCAL_STORAGE_EMPLOYEES_KEY, JSON.stringify(employeeForms));
+      } catch (e) {
+        console.error('Failed to save employee forms to Storage:', e);
+      }
+    }
+
+    function loadEmployeesFromStorage() {
+      try {
+        const raw = safeStorage.getItem(LOCAL_STORAGE_EMPLOYEES_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        console.error('Failed to load employee forms from Storage:', e);
+        return null;
+      }
+    }
+
+    function saveDescriptorsToStorage() {
+      try {
+        const serializableMap = registeredDescriptorsMap.map(item => ({
+          ...item,
+          descriptor: Array.from(item.descriptor) // Convert Float32Array to standard Array
+        }));
+        safeStorage.setItem(LOCAL_STORAGE_DESCRIPTORS_KEY, JSON.stringify(serializableMap));
+      } catch (e) {
+        console.error('Failed to save descriptors to Storage:', e);
+      }
+    }
+
+    function loadDescriptorsFromStorage() {
+      try {
+        const raw = safeStorage.getItem(LOCAL_STORAGE_DESCRIPTORS_KEY);
+        if (!raw) return false;
+
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed) || parsed.length === 0) return false;
+
+        registeredDescriptorsMap = parsed.map(item => ({
+          ...item,
+          descriptor: new Float32Array(item.descriptor) // Restore Float32Array
+        }));
+
+        const labeledDescriptors = registeredDescriptorsMap.map(
+          item => new faceapi.LabeledFaceDescriptors(item.empId, [item.descriptor])
+        );
+
+        faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, STRICT_DISTANCE_THRESHOLD);
+        const btnStartCamera = document.getElementById('btnStartCamera');
+        if (btnStartCamera) btnStartCamera.disabled = false;
+
+        const progressContainer = document.getElementById('buildProgressContainer');
+        const statusText = document.getElementById('buildStatusText');
+        const percentText = document.getElementById('buildPercentText');
+        const progressBar = document.getElementById('buildProgressBar');
+
+        if (progressContainer) progressContainer.classList.remove('hidden');
+        if (statusText) statusText.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> โหลดฐานข้อมูลใบหน้าจาก Storage สำเร็จ (${registeredDescriptorsMap.length} รายการ) - พร้อมเปิดกล้องได้ทันที`;
+        if (percentText) percentText.textContent = '100%';
+        if (progressBar) progressBar.style.width = '100%';
+
+        return true;
+      } catch (e) {
+        console.error('Failed to load descriptors from Storage:', e);
+        return false;
+      }
+    }
+
+    async function loadFaceApiModels() {
+      if (isModelsLoaded) return true;
+      try {
+        if (faceapi.tf && faceapi.tf.ready) {
+          await faceapi.tf.ready();
+        }
+
+        const loadPromise = Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        ]);
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Model loading timed out (30s limit exceeded)')), 30000)
+        );
+
+        await Promise.race([loadPromise, timeoutPromise]);
+        isModelsLoaded = true;
+        return true;
+      } catch (err) {
+        console.error('Model loading error:', err);
+        showModalAlert('เกิดข้อผิดพลาดในการโหลด AI Model', `${err.message}\nกรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่อีกครั้ง`, 'error');
+        return false;
+      }
+    }
+
+    function initializeDefaultForms() {
+      employeeForms = [];
+      const defaultDivisions = ['OFF', 'FIN', 'EDU', 'ENG', 'PHE'];
+      
+      defaultDivisions.forEach((divCode, idx) => {
+        const divInfo = DIVISIONS[divCode];
+        employeeForms.push({
+          id: formIdCounter++,
+          empId: `${divInfo.prefix}-${101 + idx}`,
+          name: '',
+          divisionCode: divCode,
+          divisionName: divInfo.name,
+          department: '',
+          position: '',
+          photoBase64: null
+        });
+      });
+
+      renderEmployeeForms();
+      saveEmployeesToStorage();
+    }
+
+    function renderEmployeeForms() {
+      const container = document.getElementById('formsContainer');
+      if (!container) return;
+
+      container.innerHTML = '';
+
+      employeeForms.forEach((form, index) => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-950/90 rounded-xl p-4 border border-slate-800 space-y-3 relative group hover:border-slate-700 transition-colors shadow-md';
+
+        const divOptions = Object.keys(DIVISIONS).map(code => {
+          const div = DIVISIONS[code];
+          const selected = form.divisionCode === code ? 'selected' : '';
+          return `<option value="${code}" ${selected}>${div.name} (${div.prefix})</option>`;
+        }).join('');
+
+        const photoHtml = form.photoBase64 ? `
+          <div class="relative w-full h-36 rounded-lg overflow-hidden bg-slate-900 border border-slate-700">
+            <img src="${form.photoBase64}" class="w-full h-full object-cover">
+            <button onclick="removePhoto(${form.id})" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-rose-600/90 hover:bg-rose-500 text-white text-xs flex items-center justify-center shadow-lg transition-transform active:scale-95" title="ลบรูปภาพ">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        ` : `
+          <label class="flex flex-col items-center justify-center w-full h-36 border-2 border-slate-800 border-dashed rounded-lg cursor-pointer bg-slate-900/50 hover:bg-slate-800/60 hover:border-sky-500/50 transition-all text-slate-400 group-hover:text-sky-400">
+            <div class="flex flex-col items-center justify-center pt-3 pb-3">
+              <i class="fa-solid fa-cloud-arrow-up text-2xl mb-1 text-slate-500 group-hover:text-sky-400"></i>
+              <p class="text-[11px] font-semibold">คลิกเพื่ออัปโหลดรูปภาพ</p>
+              <p class="text-[10px] text-slate-500">JPG, PNG (เห็นใบหน้าชัดเจน)</p>
+            </div>
+            <input type="file" accept="image/*" class="hidden" onchange="handlePhotoUpload(${form.id}, this)">
+          </label>
+        `;
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+            <span class="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-id-card text-indigo-400"></i>
+              พนักงานคนที่ ${index + 1}
+            </span>
+            ${employeeForms.length > 1 ? `
+              <button onclick="deleteEmployeeForm(${form.id})" class="text-xs text-slate-500 hover:text-rose-400 transition-colors p-1" title="ลบฟอร์มนี้">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            ` : ''}
+          </div>
+
+          <div class="grid grid-cols-1 gap-2.5">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">สังกัด กอง/กลุ่มหน่วยงาน</label>
+              <select onchange="handleDivisionChange(${form.id}, this.value)" class="w-full bg-slate-900 text-xs text-slate-200 rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none focus:border-sky-500">
+                ${divOptions}
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">รหัสพนักงาน</label>
+                <input type="text" value="${escapeHtml(form.empId)}" oninput="handleInputChange(${form.id}, 'empId', this.value)" 
+                       placeholder="เช่น OFF-101" class="w-full bg-slate-900 text-xs font-mono text-sky-300 rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">ชื่อ-นามสกุล</label>
+                <input type="text" value="${escapeHtml(form.name)}" oninput="handleInputChange(${form.id}, 'name', this.value)" 
+                       placeholder="นายสมชาย ใจดี" class="w-full bg-slate-900 text-xs text-slate-200 rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none focus:border-sky-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">ฝ่าย / งาน</label>
+                <input type="text" value="${escapeHtml(form.department)}" oninput="handleInputChange(${form.id}, 'department', this.value)" 
+                       placeholder="ฝ่ายบริหารทั่วไป" class="w-full bg-slate-900 text-xs text-slate-200 rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">ตำแหน่ง</label>
+                <input type="text" value="${escapeHtml(form.position)}" oninput="handleInputChange(${form.id}, 'position', this.value)" 
+                       placeholder="เจ้าพนักงาน..." class="w-full bg-slate-900 text-xs text-slate-200 rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none focus:border-sky-500">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">รูปถ่ายพนักงาน (มีใบหน้าชัดเจน)</label>
+              ${photoHtml}
+            </div>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function addEmployeeForm() {
+      const defaultDiv = 'OFF';
+      const divInfo = DIVISIONS[defaultDiv];
+      const nextNum = 101 + employeeForms.length;
+      
+      employeeForms.push({
+        id: formIdCounter++,
+        empId: `${divInfo.prefix}-${nextNum}`,
+        name: '',
+        divisionCode: defaultDiv,
+        divisionName: divInfo.name,
+        department: '',
+        position: '',
+        photoBase64: null
+      });
+
+      renderEmployeeForms();
+      saveEmployeesToStorage();
+      showToast('เพิ่มฟอร์มพนักงานใหม่เรียบร้อยแล้ว', 'info');
+    }
+
+    function deleteEmployeeForm(id) {
+      if (employeeForms.length <= 1) {
+        showToast('ต้องมีฟอร์มลงทะเบียนอย่างน้อย 1 รายการ', 'warning');
+        return;
+      }
+      employeeForms = employeeForms.filter(f => f.id !== id);
+      renderEmployeeForms();
+      saveEmployeesToStorage();
+    }
+
+    function removePhoto(id) {
+      const form = employeeForms.find(f => f.id === id);
+      if (form) {
+        form.photoBase64 = null;
+        renderEmployeeForms();
+        saveEmployeesToStorage();
+        showToast('ลบรูปภาพพนักงานเรียบร้อย', 'info');
+      }
+    }
+
+    function handleDivisionChange(id, newCode) {
+      const form = employeeForms.find(f => f.id === id);
+      if (!form) return;
+
+      const divInfo = DIVISIONS[newCode];
+      form.divisionCode = newCode;
+      form.divisionName = divInfo.name;
+
+      let currNum = '101';
+      const match = form.empId.match(/\d+/);
+      if (match) currNum = match[0];
+      
+      form.empId = `${divInfo.prefix}-${currNum}`;
+      renderEmployeeForms();
+      saveEmployeesToStorage();
+    }
+
+    function handleInputChange(id, field, value) {
+      const form = employeeForms.find(f => f.id === id);
+      if (form) {
+        form[field] = value;
+        saveEmployeesToStorage();
+      }
+    }
+
+    function resizeImageMax640(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            const maxDimension = 640;
+
+            if (width > maxDimension || height > maxDimension) {
+              if (width > height) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+              } else {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          };
+          img.onerror = (err) => reject(err);
+          img.src = e.target.result;
+        };
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function handlePhotoUpload(id, fileInput) {
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      const form = employeeForms.find(f => f.id === id);
+      if (!form) return;
+
+      try {
+        const resizedBase64 = await resizeImageMax640(file);
+        form.photoBase64 = resizedBase64;
+        renderEmployeeForms();
+        saveEmployeesToStorage();
+        showToast(`อัปโหลดรูปของ ${form.empId} สำเร็จ`, 'success');
+      } catch (err) {
+        console.error('Error processing image:', err);
+        showToast('เกิดข้อผิดพลาดในการปรับขนาดรูปภาพ', 'error');
+      }
+    }
+
+    function confirmResetEmployees() {
+      showModalConfirm(
+        'ยืนยันการรีเซ็ตข้อมูลพนักงาน?',
+        'คุณต้องการรีเซ็ตข้อมูลพนักงานและฐานข้อมูลใบหน้าทั้งหมดใช่หรือไม่?',
+        () => clearEmployeeData()
+      );
+    }
+
+    function clearEmployeeData() {
+      safeStorage.removeItem(LOCAL_STORAGE_EMPLOYEES_KEY);
+      safeStorage.removeItem(LOCAL_STORAGE_DESCRIPTORS_KEY);
+      registeredDescriptorsMap = [];
+      faceMatcher = null;
+      
+      const btnStartCamera = document.getElementById('btnStartCamera');
+      if (btnStartCamera) btnStartCamera.disabled = true;
+
+      document.getElementById('buildProgressContainer')?.classList.add('hidden');
+      initializeDefaultForms();
+      showToast('รีเซ็ตข้อมูลพนักงานเรียบร้อยแล้ว', 'info');
+    }
+
+    function closeIframeNotice() {
+      document.getElementById('iframeNoticeBanner')?.classList.add('hidden');
+    }
+
+    async function buildFaceDatabase() {
+      const validForms = employeeForms.filter(f => f.photoBase64);
+
+      if (validForms.length === 0) {
+        showModalAlert('ไม่พบรูปถ่ายพนักงาน', 'กรุณาอัปโหลดรูปถ่ายพนักงานอย่างน้อย 1 คน ก่อนทำการ Build Face Database', 'warning');
+        return;
+      }
+
+      const successModels = await loadFaceApiModels();
+      if (!successModels) return;
+
+      const progressContainer = document.getElementById('buildProgressContainer');
+      const statusText = document.getElementById('buildStatusText');
+      const progressBar = document.getElementById('buildProgressBar');
+      const percentText = document.getElementById('buildPercentText');
+
+      if (progressContainer) progressContainer.classList.remove('hidden');
+      registeredDescriptorsMap = [];
+      const labeledDescriptors = [];
+
+      let processedCount = 0;
+      let missedFaces = [];
+
+      for (let i = 0; i < validForms.length; i++) {
+        const form = validForms[i];
+        if (statusText) statusText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> สกัดใบหน้า: ${form.name || form.empId}...`;
+        
+        const percent = Math.round(((i + 1) / validForms.length) * 100);
+        if (progressBar) progressBar.style.width = `${percent}%`;
+        if (percentText) percentText.textContent = `${percent}%`;
+
+        await new Promise(r => setTimeout(r, 20));
+
+        try {
+          const imgEl = await faceapi.fetchImage(form.photoBase64);
+          const detection = await faceapi.detectSingleFace(imgEl, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 }))
+                                         .withFaceLandmarks()
+                                         .withFaceDescriptor();
+
+          if (detection) {
+            registeredDescriptorsMap.push({
+              empId: form.empId,
+              name: form.name || 'ไม่ระบุชื่อ',
+              divisionCode: form.divisionCode,
+              divisionName: form.divisionName,
+              department: form.department || 'ไม่ระบุ',
+              position: form.position || 'ไม่ระบุ',
+              photoBase64: form.photoBase64,
+              descriptor: detection.descriptor
+            });
+
+            labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(form.empId, [detection.descriptor]));
+            processedCount++;
+          } else {
+            missedFaces.push(`${form.empId} - ${form.name || 'ไม่ระบุชื่อ'}`);
+          }
+        } catch (err) {
+          console.error(`Error processing ${form.empId}:`, err);
+          missedFaces.push(`${form.empId} - ${form.name || 'ไม่ระบุชื่อ'}`);
+        }
+      }
+
+      if (labeledDescriptors.length > 0) {
+        faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, STRICT_DISTANCE_THRESHOLD);
+        const btnStart = document.getElementById('btnStartCamera');
+        if (btnStart) btnStart.disabled = false;
+        
+        saveEmployeesToStorage();
+        saveDescriptorsToStorage();
+
+        showToast(`สร้างและบันทึกฐานข้อมูลสำเร็จ ${processedCount} รายการ`, 'success');
+      } else {
+        showToast('ไม่พบใบหน้าตรงตามเงื่อนไขในรูปที่อัปโหลด', 'error');
+      }
+
+      if (missedFaces.length > 0) {
+        showModalAlert('ไม่พบใบหน้าในบางรูปภาพ', `ไม่สามารถตรวจจับใบหน้าในรูปของพนักงานต่อไปนี้:\n- ${missedFaces.join('\n- ')}\nกรุณาเปลี่ยนรูปถ่ายที่เห็นใบหน้าชัดเจน`, 'warning');
+      }
+
+      if (statusText) statusText.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> สร้างฐานข้อมูลใบหน้าเสร็จสิ้น (${processedCount}/${validForms.length} คน)`;
+    }
+
+    async function startCamera() {
+      if (!faceMatcher) {
+        showToast('กรุณา Build Face Database ก่อนเปิดกล้อง', 'warning');
+        return;
+      }
+
+      if (!isModelsLoaded) {
+        const successModels = await loadFaceApiModels();
+        if (!successModels) return;
+      }
+
+      const video = document.getElementById('webcam');
+      const placeholder = document.getElementById('cameraPlaceholder');
+      const errorOverlay = document.getElementById('cameraErrorOverlay');
+
+      if (errorOverlay) errorOverlay.classList.add('hidden');
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: 'user'
+          },
+          audio: false
+        });
+
+        mediaStream = stream;
+        if (video) video.srcObject = stream;
+        if (placeholder) placeholder.classList.add('hidden');
+
+        if (video) {
+          video.onloadedmetadata = () => {
+            isCameraScanning = true;
+            const btnStart = document.getElementById('btnStartCamera');
+            const btnStop = document.getElementById('btnStopCamera');
+            if (btnStart) btnStart.disabled = true;
+            if (btnStop) btnStop.disabled = false;
+            showToast('เปิดกล้องสำเร็จ กำลังเริ่มสแกน Real-time', 'success');
+            startScanLoop();
+          };
+        }
+
+      } catch (err) {
+        console.error('Camera access error:', err);
+        handleCameraError(err);
+      }
+    }
+
+    function handleCameraError(err) {
+      const errorOverlay = document.getElementById('cameraErrorOverlay');
+      const errTitle = document.getElementById('cameraErrorTitle');
+      const errMsg = document.getElementById('cameraErrorMessage');
+      const iframeHelp = document.getElementById('iframeHelpText');
+
+      if (errorOverlay) errorOverlay.classList.remove('hidden');
+      if (errTitle) errTitle.textContent = `ไม่สามารถเข้าถึงกล้องได้ (${err.name || 'Error'})`;
+
+      if (errMsg) {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          errMsg.textContent = 'สาเหตุ: ผู้ใช้ปฏิเสธการเข้าถึงกล้อง หรือถูกบล็อกโดย Browser Security Policy';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          errMsg.textContent = 'สาเหตุ: ไม่พบอุปกรณ์กล้องเชื่อมต่อกับคอมพิวเตอร์/มือถือของคุณ';
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          errMsg.textContent = 'สาเหตุ: กล้องกำลังถูกใช้งานโดยโปรแกรมหรือแอปพลิเคชันอื่นอยู่';
+        } else {
+          errMsg.textContent = `สาเหตุ: ${err.message || 'เกิดปัญหาขัดข้องในการเปิดอุปกรณ์กล้อง'}`;
+        }
+      }
+
+      if (iframeHelp) {
+        if (window.self !== window.top) {
+          iframeHelp.classList.remove('hidden');
+        } else {
+          iframeHelp.classList.add('hidden');
+        }
+      }
+    }
+
+    function stopCamera() {
+      isCameraScanning = false;
+      if (scanIntervalId) clearInterval(scanIntervalId);
+
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+      }
+
+      const video = document.getElementById('webcam');
+      if (video) video.srcObject = null;
+
+      document.getElementById('cameraPlaceholder')?.classList.remove('hidden');
+      const btnStart = document.getElementById('btnStartCamera');
+      const btnStop = document.getElementById('btnStopCamera');
+      if (btnStart) btnStart.disabled = false;
+      if (btnStop) btnStop.disabled = true;
+
+      const canvas = document.getElementById('overlayCanvas');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+
+      resetDetectedCard();
+      showToast('ปิดใช้งานกล้องเรียบร้อย', 'info');
+    }
+
+    function updateShiftBadgeInfo() {
+      const currentHour = new Date().getHours();
+      const shiftText = document.getElementById('shiftText');
+      const autoRuleHint = document.getElementById('autoScanRuleHint');
+
+      if (shiftText) {
+        shiftText.textContent = currentHour < 12 ? 'โหมดเข้างาน (< 12:00 น.)' : 'โหมดออกงาน (≥ 12:00 น.)';
+      }
+      if (autoRuleHint) {
+        autoRuleHint.textContent = currentHour < 12 ? 'สแกนอัตโนมัติ: บันทึก "เข้างาน"' : 'สแกนอัตโนมัติ: บันทึก "ออกงาน"';
+      }
+    }
+
+    function startScanLoop() {
+      const video = document.getElementById('webcam');
+      const canvas = document.getElementById('overlayCanvas');
+      if (!video || !canvas) return;
+
+      scanIntervalId = setInterval(async () => {
+        if (!isCameraScanning || video.paused || video.ended) return;
+
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
+
+        const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
+        const detections = await faceapi.detectAllFaces(video, options)
+                                        .withFaceLandmarks()
+                                        .withFaceDescriptors();
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const resizedDetections = faceapi.resizeResults(detections, { width: canvas.width, height: canvas.height });
+
+        if (resizedDetections.length === 0) {
+          matchStreakMap = {};
+          resetDetectedCard();
+          return;
+        }
+
+        let bestMatchFound = null;
+
+        resizedDetections.forEach(det => {
+          const match = faceMatcher.matchDescriptor(det.descriptor);
+          const box = det.detection.box;
+
+          let boxColor = '#ef4444';
+          let labelText = 'Unknown (ไม่ผ่านเกณฑ์ยึดถือ)';
+
+          if (match.label !== 'unknown' && match.distance <= STRICT_DISTANCE_THRESHOLD) {
+            const matchedEmp = registeredDescriptorsMap.find(m => m.empId === match.label);
+            if (matchedEmp) {
+              boxColor = '#10b981';
+              const matchAccuracyPercent = Math.round((1 - match.distance) * 100);
+              labelText = `${matchedEmp.name} (${matchedEmp.empId}) - ${matchAccuracyPercent}% Match`;
+              bestMatchFound = { matchedEmp, distance: match.distance };
+            }
+          }
+
+          ctx.strokeStyle = boxColor;
+          ctx.lineWidth = 3.5;
+          ctx.strokeRect(canvas.width - box.x - box.width, box.y, box.width, box.height);
+
+          ctx.fillStyle = boxColor;
+          ctx.font = 'bold 13px Sarabun, sans-serif';
+          const textWidth = ctx.measureText(labelText).width;
+          ctx.fillRect(canvas.width - box.x - box.width, box.y - 26, textWidth + 12, 26);
+
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(labelText, canvas.width - box.x - box.width + 6, box.y - 8);
+        });
+
+        if (bestMatchFound) {
+          const emp = bestMatchFound.matchedEmp;
+          updateDetectedCard(emp, bestMatchFound.distance);
+
+          matchStreakMap[emp.empId] = (matchStreakMap[emp.empId] || 0) + 1;
+
+          if (matchStreakMap[emp.empId] >= 2) {
+            const autoCheckInToggle = document.getElementById('autoCheckInToggle');
+            const autoCheckInEnabled = autoCheckInToggle ? autoCheckInToggle.checked : true;
+            const now = Date.now();
+            const lastScan = scanCooldownsMap[emp.empId] || 0;
+            const timeSinceLastScan = now - lastScan;
+
+            if (autoCheckInEnabled) {
+              if (timeSinceLastScan >= SCAN_COOLDOWN_MS) {
+                const currentHour = new Date().getHours();
+                const autoType = currentHour < 12 ? 'IN' : 'OUT';
+
+                recordAttendance(autoType, emp);
+                scanCooldownsMap[emp.empId] = now;
+              } else {
+                const remainingSec = Math.ceil((SCAN_COOLDOWN_MS - timeSinceLastScan) / 1000);
+                const remainingMin = Math.floor(remainingSec / 60);
+                const remSecStr = remainingSec % 60;
+                
+                const badge = document.getElementById('scanStatusBadge');
+                if (badge) {
+                  badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-sky-950 text-sky-400 border border-sky-800 flex items-center gap-1.5';
+                  badge.innerHTML = `<i class="fa-solid fa-circle-check text-sky-400"></i> บันทึกแล้ว (พักสแกนอีก ${remainingMin}:${String(remSecStr).padStart(2, '0')} นาที)`;
+                }
+              }
+            }
+          }
+        } else {
+          matchStreakMap = {};
+          resetDetectedCard();
+        }
+
+      }, 200);
+    }
+
+    function updateDetectedCard(emp, distance) {
+      currentDetectedPerson = emp;
+
+      const nameEl = document.getElementById('detectedName');
+      const idEl = document.getElementById('detectedEmpId');
+      const divEl = document.getElementById('detectedDivision');
+      const deptPosEl = document.getElementById('detectedDeptPos');
+      const matchScoreEl = document.getElementById('detectedMatchScore');
+
+      if (nameEl) nameEl.textContent = emp.name;
+      if (idEl) idEl.textContent = `ID: ${emp.empId}`;
+      if (divEl) divEl.textContent = `สังกัด: ${emp.divisionName}`;
+      if (deptPosEl) deptPosEl.textContent = `ฝ่าย: ${emp.department} | ตำแหน่ง: ${emp.position}`;
+      if (matchScoreEl) matchScoreEl.textContent = `ค่าความตรงกัน (Distance): ${distance.toFixed(3)}`;
+
+      const imgEl = document.getElementById('detectedImg');
+      const iconEl = document.getElementById('detectedPlaceholderIcon');
+      if (emp.photoBase64) {
+        if (imgEl) {
+          imgEl.src = emp.photoBase64;
+          imgEl.classList.remove('hidden');
+        }
+        if (iconEl) iconEl.classList.add('hidden');
+      }
+
+      const badge = document.getElementById('scanStatusBadge');
+      if (badge) {
+        badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center gap-1.5';
+        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> ยืนยันตัวตนสำเร็จ`;
+      }
+
+      const btnCheckIn = document.getElementById('btnCheckIn');
+      const btnCheckOut = document.getElementById('btnCheckOut');
+      if (btnCheckIn) btnCheckIn.disabled = false;
+      if (btnCheckOut) btnCheckOut.disabled = false;
+    }
+
+    function resetDetectedCard() {
+      currentDetectedPerson = null;
+
+      const nameEl = document.getElementById('detectedName');
+      const idEl = document.getElementById('detectedEmpId');
+      const divEl = document.getElementById('detectedDivision');
+      const deptPosEl = document.getElementById('detectedDeptPos');
+      const matchScoreEl = document.getElementById('detectedMatchScore');
+
+      if (nameEl) nameEl.textContent = '-- รอการสแกน --';
+      if (idEl) idEl.textContent = 'ID: --';
+      if (divEl) divEl.textContent = 'สังกัด: --';
+      if (deptPosEl) deptPosEl.textContent = 'ฝ่าย: -- | ตำแหน่ง: --';
+      if (matchScoreEl) matchScoreEl.textContent = 'ค่าความตรงกัน (Distance): --';
+
+      const imgEl = document.getElementById('detectedImg');
+      const iconEl = document.getElementById('detectedPlaceholderIcon');
+      if (imgEl) imgEl.classList.add('hidden');
+      if (iconEl) iconEl.classList.remove('hidden');
+
+      const badge = document.getElementById('scanStatusBadge');
+      if (badge) {
+        badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400 flex items-center gap-1.5';
+        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-500"></span> กำลังค้นหาใบหน้า...`;
+      }
+
+      const btnCheckIn = document.getElementById('btnCheckIn');
+      const btnCheckOut = document.getElementById('btnCheckOut');
+      if (btnCheckIn) btnCheckIn.disabled = true;
+      if (btnCheckOut) btnCheckOut.disabled = true;
+    }
+
+    function handleManualCheckInOut(type) {
+      if (!currentDetectedPerson) {
+        showToast('กรุณารอระบบสแกนพบใบหน้าพนักงานก่อนกดบันทึก', 'warning');
+        return;
+      }
+      recordAttendance(type, currentDetectedPerson);
+    }
+
+    function recordAttendance(type, emp) {
+      const timestamp = new Date().toLocaleString('th-TH', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+
+      const logEntry = {
+        id: Date.now(),
+        timestamp: timestamp,
+        type: type,
+        empId: emp.empId,
+        name: emp.name,
+        divisionCode: emp.divisionCode,
+        divisionName: emp.divisionName,
+        department: emp.department,
+        position: emp.position,
+        syncStatus: 'pending'
+      };
+
+      const existingLogs = getSavedLogs();
+      existingLogs.unshift(logEntry);
+      safeStorage.setItem(LOCAL_STORAGE_LOGS_KEY, JSON.stringify(existingLogs));
+
+      showToast(`บันทึกเวลา "${type === 'IN' ? 'เข้างาน' : 'ออกงาน'}" สำเร็จ: ${emp.name}`, 'success');
+      renderLogsTable();
+
+      const scriptUrl = safeStorage.getItem(LOCAL_STORAGE_SCRIPT_KEY);
+      if (scriptUrl) {
+        syncToGoogleScript(scriptUrl, logEntry);
+      }
+    }
+
+    function getSavedLogs() {
+      try {
+        const raw = safeStorage.getItem(LOCAL_STORAGE_LOGS_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        console.error('Failed to parse logs from Storage', e);
+        return [];
+      }
+    }
+
+    async function syncToGoogleScript(url, logEntry) {
+      const payload = {
+        timestamp: logEntry.timestamp,
+        type: logEntry.type === 'IN' ? 'เข้างาน' : 'ออกงาน',
+        empId: logEntry.empId,
+        name: logEntry.name,
+        division: logEntry.divisionName,
+        department: logEntry.department,
+        position: logEntry.position
+      };
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      try {
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        updateLogSyncStatus(logEntry.id, 'synced');
+      } catch (err) {
+        console.warn('Apps Script sync timeout or error:', err);
+        updateLogSyncStatus(logEntry.id, 'offline');
+      }
+    }
+
+    function updateLogSyncStatus(logId, status) {
+      const logs = getSavedLogs();
+      const idx = logs.findIndex(l => l.id === logId);
+      if (idx !== -1) {
+        logs[idx].syncStatus = status;
+        safeStorage.setItem(LOCAL_STORAGE_LOGS_KEY, JSON.stringify(logs));
+        renderLogsTable();
+      }
+    }
+
+    function saveScriptUrl() {
+      const input = document.getElementById('scriptUrlInput');
+      if (input) {
+        const val = input.value.trim();
+        safeStorage.setItem(LOCAL_STORAGE_SCRIPT_KEY, val);
+        showToast('บันทึก Google Apps Script URL เรียบร้อย', 'success');
+      }
+    }
+
+    function renderLogsTable() {
+      const logs = getSavedLogs();
+      const tbody = document.getElementById('logsTableBody');
+      if (!tbody) return;
+
+      tbody.innerHTML = '';
+
+      const filterDivEl = document.getElementById('filterDivision');
+      const filterSearchEl = document.getElementById('filterSearch');
+      const filterTypeEl = document.getElementById('filterType');
+
+      const filterDiv = filterDivEl ? filterDivEl.value : 'ALL';
+      const filterSearch = filterSearchEl ? filterSearchEl.value.toLowerCase().trim() : '';
+      const filterType = filterTypeEl ? filterTypeEl.value : 'ALL';
+
+      const filteredLogs = logs.filter(log => {
+        if (filterDiv !== 'ALL' && log.divisionCode !== filterDiv) return false;
+        if (filterType !== 'ALL' && log.type !== filterType) return false;
+        if (filterSearch) {
+          const matchName = log.name.toLowerCase().includes(filterSearch);
+          const matchId = log.empId.toLowerCase().includes(filterSearch);
+          if (!matchName && !matchId) return false;
+        }
+        return true;
+      });
+
+      const badge = document.getElementById('logCountBadge');
+      if (badge) badge.textContent = `${filteredLogs.length} รายการ`;
+
+      if (filteredLogs.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="py-8 text-center text-slate-500 text-xs">
+              <i class="fa-solid fa-inbox text-2xl mb-2 block text-slate-600"></i>
+              ไม่พบประวัติการลงเวลา
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      filteredLogs.forEach(log => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition-colors';
+
+        const typeBadge = log.type === 'IN' 
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">เข้างาน</span>`
+          : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950 text-amber-400 border border-amber-800">ออกงาน</span>`;
+
+        let syncBadge = `<span class="text-slate-500" title="ยังไม่ได้ส่ง"><i class="fa-solid fa-circle-notch fa-spin"></i></span>`;
+        if (log.syncStatus === 'synced') {
+          syncBadge = `<span class="text-emerald-400" title="ส่งขึ้น Apps Script เรียบร้อย"><i class="fa-solid fa-cloud-check"></i></span>`;
+        } else if (log.syncStatus === 'offline') {
+          syncBadge = `<span class="text-slate-400" title="เก็บลงเครื่อง Local Only"><i class="fa-solid fa-hard-drive"></i></span>`;
+        }
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-4 font-mono text-[11px] text-slate-300 whitespace-nowrap">${log.timestamp}</td>
+          <td class="py-2.5 px-4">${typeBadge}</td>
+          <td class="py-2.5 px-4 font-mono text-sky-400 font-bold">${log.empId}</td>
+          <td class="py-2.5 px-4 font-semibold text-slate-200">${log.name}</td>
+          <td class="py-2.5 px-4">
+            <span class="px-2 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-800/50 text-[10px] font-semibold">
+              ${log.divisionName || log.divisionCode}
+            </span>
+          </td>
+          <td class="py-2.5 px-4 text-slate-400">${log.department} / ${log.position}</td>
+          <td class="py-2.5 px-4 text-center">${syncBadge}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function exportToCSV() {
+      const logs = getSavedLogs();
+      if (logs.length === 0) {
+        showToast('ไม่มีข้อมูลการลงเวลาสำหรับดาวน์โหลด', 'warning');
+        return;
+      }
+
+      let csvContent = '\uFEFF';
+      csvContent += 'ลำดับ,วัน-เวลา,ประเภท,รหัสพนักงาน,ชื่อ-นามสกุล,สังกัดกอง/หน่วยงาน,ฝ่าย/งาน,ตำแหน่ง\n';
+
+      logs.forEach((log, i) => {
+        const typeStr = log.type === 'IN' ? 'เข้างาน' : 'ออกงาน';
+        csvContent += `"${i + 1}","${log.timestamp}","${typeStr}","${log.empId}","${log.name}","${log.divisionName}","${log.department}","${log.position}"\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      
+      const fileName = `attendance_log_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 1500);
+
+      showToast(`ส่งออกไฟล์ ${fileName} เรียบร้อย`, 'success');
+    }
+
+    function confirmClearLogs() {
+      showModalConfirm(
+        'ยืนยันการล้างประวัติลงเวลา?',
+        'ข้อมูลบันทึกประวัติการลงเวลาทั้งหมดใน Storage จะถูกลบออก และไม่สามารถกู้คืนได้',
+        () => executeClearLogs()
+      );
+    }
+
+    function executeClearLogs() {
+      safeStorage.removeItem(LOCAL_STORAGE_LOGS_KEY);
+      renderLogsTable();
+      showToast('ล้างประวัติการลงเวลาทั้งหมดเรียบร้อยแล้ว', 'info');
+    }
+
+    function showToast(msg, type = 'info') {
+      const toast = document.getElementById('toast');
+      const toastMessage = document.getElementById('toastMessage');
+      const toastIcon = document.getElementById('toastIcon');
+
+      if (!toast || !toastMessage || !toastIcon) return;
+
+      toastMessage.textContent = msg;
+
+      if (type === 'success') {
+        toastIcon.className = 'fa-solid fa-circle-check text-emerald-400 text-lg';
+      } else if (type === 'error') {
+        toastIcon.className = 'fa-solid fa-circle-exclamation text-rose-400 text-lg';
+      } else if (type === 'warning') {
+        toastIcon.className = 'fa-solid fa-triangle-exclamation text-amber-400 text-lg';
+      } else {
+        toastIcon.className = 'fa-solid fa-circle-info text-sky-400 text-lg';
+      }
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3500);
+    }
+  </script>
+</body>
+</html>
