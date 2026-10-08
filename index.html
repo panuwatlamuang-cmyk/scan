@@ -146,17 +146,17 @@
           </button>
         </div>
       </div>
-
+      <!-- Division Prefix Info Banner -->
       <div class="bg-slate-950/60 rounded-xl p-3 mb-6 border border-slate-800 text-xs flex flex-wrap items-center gap-3">
         <span class="font-bold text-slate-300 flex items-center gap-1">
           <i class="fa-solid fa-sitemap text-indigo-400"></i>
-          รหัสขึ้นต้นตาม 5 หน่วยงานหลัก:
+          รหัสขึ้นต้นแยกตาม 5 หน่วยงานหลัก:
         </span>
-        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">OFF-</strong> สำนักปลัด</span>
-        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">FIN-</strong> กองคลัง</span>
-        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">EDU-</strong> กองการศึกษา</span>
-        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">ENG-</strong> กองช่าง</span>
-        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">PHE-</strong> กองสาธารณสุขและสิ่งแวดล้อม</span>
+        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">OFF-1xx</strong> สำนักปลัด (เลขขึ้นต้น 1)</span>
+        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">FIN-2xx</strong> กองคลัง (เลขขึ้นต้น 2)</span>
+        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">EDU-3xx</strong> กองการศึกษา (เลขขึ้นต้น 3)</span>
+        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">ENG-4xx</strong> กองช่าง (เลขขึ้นต้น 4)</span>
+        <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700"><strong class="text-sky-400">PHE-5xx</strong> กองสาธารณสุขและสิ่งแวดล้อม (เลขขึ้นต้น 5)</span>
       </div>
 
       <!-- Dynamic Employee Registration Cards Container -->
@@ -481,13 +481,13 @@
     const STRICT_DISTANCE_THRESHOLD = 0.40; // High accuracy lock threshold
     const SCAN_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown per person
 
-    // Fixed 5 Division Definitions
+    // Fixed 5 Division Definitions with unique starting digits (1xx, 2xx, 3xx, 4xx, 5xx)
     const DIVISIONS = {
-      'OFF': { name: 'สำนักปลัด', prefix: 'OFF' },
-      'FIN': { name: 'กองคลัง', prefix: 'FIN' },
-      'EDU': { name: 'กองการศึกษา', prefix: 'EDU' },
-      'ENG': { name: 'กองช่าง', prefix: 'ENG' },
-      'PHE': { name: 'กองสาธารณสุขและสิ่งแวดล้อม', prefix: 'PHE' }
+      'OFF': { name: 'สำนักปลัด', prefix: 'OFF', baseNo: 101 },
+      'FIN': { name: 'กองคลัง', prefix: 'FIN', baseNo: 201 },
+      'EDU': { name: 'กองการศึกษา', prefix: 'EDU', baseNo: 301 },
+      'ENG': { name: 'กองช่าง', prefix: 'ENG', baseNo: 401 },
+      'PHE': { name: 'กองสาธารณสุขและสิ่งแวดล้อม', prefix: 'PHE', baseNo: 501 }
     };
 
     // App Global State
@@ -697,11 +697,11 @@
       employeeForms = [];
       const defaultDivisions = ['OFF', 'FIN', 'EDU', 'ENG', 'PHE'];
       
-      defaultDivisions.forEach((divCode, idx) => {
+      defaultDivisions.forEach((divCode) => {
         const divInfo = DIVISIONS[divCode];
         employeeForms.push({
           id: formIdCounter++,
-          empId: `${divInfo.prefix}-${101 + idx}`,
+          empId: `${divInfo.prefix}-${divInfo.baseNo}`,
           name: '',
           divisionCode: divCode,
           divisionName: divInfo.name,
@@ -815,7 +815,8 @@
     function addEmployeeForm() {
       const defaultDiv = 'OFF';
       const divInfo = DIVISIONS[defaultDiv];
-      const nextNum = 101 + employeeForms.length;
+      const countInDiv = employeeForms.filter(f => f.divisionCode === defaultDiv).length;
+      const nextNum = divInfo.baseNo + countInDiv;
       
       employeeForms.push({
         id: formIdCounter++,
@@ -861,11 +862,11 @@
       form.divisionCode = newCode;
       form.divisionName = divInfo.name;
 
-      let currNum = '101';
-      const match = form.empId.match(/\d+/);
-      if (match) currNum = match[0];
+      // Calculate next available number for the newly selected division
+      const otherFormsInDiv = employeeForms.filter(f => f.id !== id && f.divisionCode === newCode);
+      const nextNum = divInfo.baseNo + otherFormsInDiv.length;
       
-      form.empId = `${divInfo.prefix}-${currNum}`;
+      form.empId = `${divInfo.prefix}-${nextNum}`;
       renderEmployeeForms();
       saveEmployeesToStorage();
     }
